@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le Videur</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; user-select: none; }
+  :root { --ink: #111; --red: #e03131; --gold: #d4a017; --rope: #a51d2d; }
+  #stage { position: fixed; inset: 0; pointer-events: none; }
+  #stage.shake { animation: shake .3s; }
+  @keyframes shake { 25% { transform: translate(-6px, 3px); } 50% { transform: translate(5px, -3px); } 75% { transform: translate(-2px, 1px); } }
+
+  /* ---------- Corde de boîte de nuit ---------- */
+  #rope { position: absolute; left: 0; right: 0; bottom: 0; height: 130px; opacity: 0; transition: opacity .25s; }
+  #rope.on { opacity: 1; }
+  #rope svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 0 1.5px #fff); }
+
+  /* ---------- Le videur ---------- */
+  #bouncer { position: absolute; bottom: 0; width: 230px; height: 330px; display: none; }
+  #bouncer.on { display: block; }
+  #bouncer svg { display: block; overflow: visible; filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff); }
+  .armStop { transform-box: view-box; transform-origin: 150px 120px; transition: transform .18s cubic-bezier(.2, .8, .3, 1); transform: rotate(60deg); }
+  .stop .armStop { transform: rotate(0deg); }
+  .crossed .armStop { transform: rotate(60deg); }
+  .armsX { display: none; }
+  .crossed .armsX { display: inline; }
+  .crossed .armStop, .crossed .armRest { display: none; }
+  .legs line { transform-box: view-box; transform-origin: 115px 225px; }
+  .walking .legA { animation: run .24s ease-in-out infinite alternate; }
+  .walking .legB { animation: run .24s ease-in-out infinite alternate-reverse; }
+  @keyframes run { from { transform: rotate(-20deg); } to { transform: rotate(20deg); } }
+  .stomp .body { animation: stomp .25s ease-out; }
+  @keyframes stomp { 40% { transform: translateY(-16px); } }
+  .mOpen { display: none; }
+  .talk .mOpen { display: inline; }
+  .talk .mShut { display: none; }
+
+  /* ---------- La fiche : ce que Claude veut faire ---------- */
+  #card {
+    position: absolute; bottom: 150px; width: 380px; display: none;
+    background: #111; color: #fff; border: 4px solid var(--gold); border-radius: 16px; padding: 14px 18px 16px;
+    box-shadow: 6px 6px 0 rgba(0, 0, 0, .85); transform-origin: 0 100%;
+  }
+  #card.on { display: block; animation: cardIn .3s cubic-bezier(.3, 1.5, .5, 1); }
+  @keyframes cardIn { from { transform: scale(.2) rotate(-6deg); opacity: 0; } }
+  #card .head { font: 900 13px/1.2 -apple-system, system-ui, sans-serif; letter-spacing: 1.5px; color: var(--gold); text-transform: uppercase; }
+  #card .action { font: 800 22px/1.2 -apple-system, system-ui, sans-serif; margin: 8px 0 10px; }
+  #card .detail { font: 500 12.5px/1.4 ui-monospace, Menlo, monospace; color: #c9c9c9; background: #222; border-radius: 8px; padding: 8px 10px; word-break: break-all; max-height: 74px; overflow: hidden; }
+  #card .conv { font: 600 12px/1.3 -apple-system, system-ui, sans-serif; color: #aaa; margin-top: 10px; }
+  #card .conv b { color: #fff; }
+  #card .foot { margin-top: 10px; font: 700 14px/1.3 "Chalkboard SE", "Marker Felt", "Comic Sans MS", cursive; color: #ffe14d; }
+
+  /* ---------- Bulle et onomatopée ---------- */
+  .bubble {
+    position: absolute; z-index: 6; background: #fff; color: var(--ink); border: 3px solid var(--ink); border-radius: 22px;
+    padding: 10px 16px 11px; font: 700 22px/1.2 "Chalkboard SE", "Marker Felt", "Comic Sans MS", cursive;
+    width: max-content; max-width: 320px; box-shadow: 5px 5px 0 rgba(0, 0, 0, .85);
+    transform-origin: 30px 100%; animation: pop .26s cubic-bezier(.3, 1.7, .5, 1);
+  }
+  .bubble::before, .bubble::after { content: ""; position: absolute; border-style: solid; }
+  .bubble::before { left: 26px; top: 100%; border-width: 22px 16px 0 0; border-color: var(--ink) transparent transparent transparent; }
+  .bubble::after { left: 29px; top: calc(100% - 4px); border-width: 16px 11px 0 0; border-color: #fff transparent transparent transparent; }
+  .bubble.out { opacity: 0; transform: scale(.85); transition: .2s; }
+  @keyframes pop { from { transform: scale(0) rotate(-4deg); } }
+
+  .burst { position: absolute; z-index: 7; transform: translate(-50%, -50%) rotate(-8deg); animation: burstIn .22s cubic-bezier(.3, 1.9, .5, 1); }
+  .burst span {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; white-space: nowrap;
+    font: italic 900 46px Impact, "Arial Black", sans-serif; color: #fff; letter-spacing: 1px;
+    -webkit-text-stroke: 2px #111; paint-order: stroke fill; text-shadow: 4px 4px 0 #111;
+  }
+  .burst.out { opacity: 0; transition: .3s; }
+  @keyframes burstIn { from { transform: translate(-50%, -50%) rotate(-8deg) scale(0); } }
+
+  /* ---------- Aperçu navigateur (?preview) ---------- */
+  #preview { display: none; }
+  body.preview { background: #f5f4ef; }
+  body.preview #preview { display: block; position: fixed; inset: 0; padding: 60px 10vw 0; font: 16px/1.6 -apple-system, system-ui, sans-serif; color: #333; }
+  #preview .btns { display: flex; gap: 10px; margin-top: 16px; pointer-events: auto; flex-wrap: wrap; }
+  #preview button { font: 700 15px -apple-system, system-ui, sans-serif; padding: 11px 16px; border-radius: 10px; border: 0; background: #1f1e1c; color: #fff; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="preview">
+  <p><b>Le Videur</b>, démo. Quand Claude s'apprête à faire quelque chose de dangereux, le videur l'arrête et Claude Code te demande ton accord.</p>
+  <div class="btns">
+    <button data-i="0">▶ Suppression d'un dossier</button>
+    <button data-i="1">▶ Push forcé sur GitHub</button>
+    <button data-i="2">▶ Table effacée</button>
+  </div>
+</div>
+
+<div id="stage">
+  <div id="rope"></div>
+  <div id="card">
+    <div class="head">🚫 Claude veut :</div>
+    <div class="action"></div>
+    <div class="detail"></div>
+    <div class="conv">Conversation : <b></b></div>
+    <div class="foot">Réponds dans Claude : accepte seulement si c'est voulu.</div>
+  </div>
+  <div id="bouncer"></div>
+  <div id="top"></div>
+</div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const stage = $('#stage'), rope = $('#rope'), card = $('#card'), bouncer = $('#bouncer'), topL = $('#top');
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const W = () => innerWidth, H = () => innerHeight;
+
+  const bridge = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.videur;
+  const post = (type, value) => { try { if (bridge) bridge.postMessage({ type, value: String(value) }); } catch (e) {} };
+
+  /* ----- Sons : joués par l'app, ou par le navigateur en aperçu ----- */
+  let ctx = null;
+  function webSound(name) {
+    try {
+      ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+      if (ctx.state === 'suspended') ctx.resume();
+      const t = ctx.currentTime, out = ctx.createGain(); out.gain.value = .4; out.connect(ctx.destination);
+      const tone = (f0, f1, start, dur, type) => {
+        const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type;
+        o.frequency.setValueAtTime(f0, t + start); o.frequency.exponentialRampToValueAtTime(f1, t + start + dur);
+        g.gain.setValueAtTime(0.0001, t + start); g.gain.exponentialRampToValueAtTime(1, t + start + .01); g.gain.exponentialRampToValueAtTime(0.0001, t + start + dur);
+        o.connect(g).connect(out); o.start(t + start); o.stop(t + start + dur + .05);
+      };
+      if (name === 'stomp') tone(120, 40, 0, .3, 'sine');
+      else if (name === 'buzzer') { tone(150, 145, 0, .28, 'square'); tone(150, 145, .34, .4, 'square'); }
+    } catch (e) {}
+  }
+  const sfx = (name) => (bridge ? post('sfx', name) : webSound(name));
+
+  /* ----- Dessins ----- */
+  const BOUNCER = `<svg viewBox="0 0 230 330" width="230" height="330">
+    <g stroke="#111" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <g class="legs"><line class="legA" x1="100" y1="225" x2="86" y2="322"/><line class="legB" x1="130" y1="225" x2="144" y2="322"/></g>
+      <g class="body">
+        <path d="M70 104 Q115 88 160 104 L150 232 L80 232 Z" fill="#1c1c1f" stroke-width="6"/>
+        <path d="M104 98 L115 140 L126 98" fill="#fff" stroke-width="4"/>
+        <path d="M110 104 L115 132 L120 104 Z" fill="#111" stroke="none"/>
+        <g class="armRest"><line x1="78" y1="118" x2="58" y2="214"/><circle cx="57" cy="220" r="11" fill="#fff" stroke-width="5"/></g>
+        <g class="armStop">
+          <line x1="150" y1="120" x2="212" y2="112" stroke-width="12" stroke="#1c1c1f"/>
+          <line x1="150" y1="120" x2="212" y2="112"/>
+          <path d="M212 96 Q210 86 218 86 Q224 86 224 96 L224 92 Q224 82 231 83 Q237 84 236 94 L236 96 Q237 88 243 89 Q249 91 247 101 L244 124 Q240 136 226 136 L218 136 Q208 134 208 124 Z" fill="#fff" stroke-width="5"/>
+        </g>
+        <g class="armsX">
+          <path d="M78 122 Q100 168 150 150" stroke-width="12" stroke="#1c1c1f"/>
+          <path d="M152 122 Q130 168 80 150" stroke-width="12" stroke="#1c1c1f"/>
+          <path d="M78 122 Q100 168 150 150 M152 122 Q130 168 80 150" stroke-width="4"/>
+        </g>
+        <path d="M95 92 Q115 80 135 92" stroke-width="10"/>
+        <circle cx="115" cy="54" r="38" fill="#fff"/>
+        <path d="M84 48 Q115 42 146 48 L143 60 Q130 66 118 58 L112 58 Q100 66 87 60 Z" fill="#111" stroke-width="3"/>
+        <line x1="88" y1="50" x2="104" y2="50" stroke="#555" stroke-width="2"/>
+        <path d="M151 60 Q160 72 152 92" stroke="#444" stroke-width="3"/>
+        <circle cx="151" cy="58" r="5" fill="#444" stroke-width="2"/>
+        <path class="mShut" d="M102 76 L128 76" stroke-width="5"/>
+        <ellipse class="mOpen" cx="115" cy="76" rx="12" ry="8" fill="#111" stroke-width="3"/>
+      </g>
+    </g></svg>`;
+
+  function ropeSVG(w) {
+    const posts = [w * .12, w * .5, w * .88];
+    let s = `<svg viewBox="0 0 ${w} 130" preserveAspectRatio="none">`;
+    for (let i = 0; i < posts.length - 1; i++) {
+      const a = posts[i], b = posts[i + 1], m = (a + b) / 2;
+      s += `<path d="M${a} 40 Q${m} 92 ${b} 40" stroke="#111" stroke-width="15" fill="none" stroke-linecap="round"/>`;
+      s += `<path d="M${a} 40 Q${m} 92 ${b} 40" stroke="var(--rope)" stroke-width="10" fill="none" stroke-linecap="round"/>`;
+    }
+    for (const x of posts) {
+      s += `<rect x="${x - 6}" y="34" width="12" height="90" fill="var(--gold)" stroke="#111" stroke-width="3"/>`;
+      s += `<ellipse cx="${x}" cy="124" rx="26" ry="7" fill="var(--gold)" stroke="#111" stroke-width="3"/>`;
+      s += `<circle cx="${x}" cy="30" r="10" fill="var(--gold)" stroke="#111" stroke-width="3"/>`;
+    }
+    return s + '</svg>';
+  }
+
+  let bubble = null;
+  function say(text, ms = 2200) {
+    if (bubble) bubble.remove();
+    const b = bubble = document.createElement('div');
+    b.className = 'bubble';
+    b.textContent = text;
+    b.style.left = '0px';
+    b.style.maxWidth = '250px';
+    b.style.bottom = '338px';
+    bouncer.appendChild(b);
+    bouncer.classList.add('talk');
+    setTimeout(() => { bouncer.classList.remove('talk'); b.classList.add('out'); }, ms);
+    setTimeout(() => { b.remove(); if (bubble === b) bubble = null; }, ms + 250);
+  }
+  function burst(x, y, text) {
+    const el = document.createElement('div');
+    el.className = 'burst';
+    el.style.cssText = `left:${x}px;top:${y}px;width:240px;height:90px`;
+    el.innerHTML = `<span>${text}</span>`;
+    topL.appendChild(el);
+    setTimeout(() => el.classList.add('out'), 900);
+    setTimeout(() => el.remove(), 1250);
+  }
+  function shake() { stage.classList.remove('shake'); void stage.offsetWidth; stage.classList.add('shake'); }
+
+  let busy = false;
+  async function show(ev) {
+    if (busy) return;
+    busy = true;
+    const groupW = 230 + 24 + 380;
+    const x = Math.max(16, (W() - groupW) / 2);
+
+    card.querySelector('.action').textContent = ev.action || 'Une action dangereuse';
+    card.querySelector('.detail').textContent = ev.detail || '';
+    card.querySelector('.detail').style.display = ev.detail ? '' : 'none';
+    card.querySelector('.conv b').textContent = ev.title || 'Une conversation';
+
+    rope.innerHTML = ropeSVG(W());
+    rope.classList.add('on');
+
+    bouncer.innerHTML = BOUNCER;
+    bouncer.className = 'on walking';
+    bouncer.style.transition = 'none';
+    bouncer.style.left = (-260) + 'px';
+    void bouncer.offsetWidth;
+    bouncer.style.transition = 'left .55s cubic-bezier(.2,.8,.3,1)';
+    bouncer.style.left = x + 'px';
+    await wait(550);
+    bouncer.classList.remove('walking');
+    bouncer.classList.add('stomp', 'stop');
+    sfx('stomp'); shake();
+    burst(x + 200, H() - 360, 'HALTE !');
+    await wait(250);
+    sfx('buzzer');
+
+    card.style.left = (x + 230 + 24) + 'px';
+    card.classList.add('on');
+    say(pick(["Pas sans l'accord du patron.", 'Toi, tu ne passes pas.', 'On se calme, Claude.']), 2300);
+    await wait(2500);
+    bouncer.classList.remove('stomp');
+    say('Vérifie, puis accepte ou refuse dans Claude.', 2600);
+    await wait(2800);
+    bouncer.classList.remove('stop');
+    bouncer.classList.add('crossed');
+    await wait(2600);
+
+    card.classList.remove('on');
+    rope.classList.remove('on');
+    bouncer.classList.remove('crossed');
+    bouncer.classList.add('walking');
+    bouncer.style.transition = 'left .7s ease-in';
+    bouncer.style.left = (-280) + 'px';
+    await wait(720);
+    bouncer.className = '';
+    bouncer.innerHTML = '';
+    busy = false;
+    post('done', '');
+  }
+
+  window.videur = { show, isBusy: () => busy };
+
+  if (location.search.includes('preview')) {
+    document.body.classList.add('preview');
+    const samples = [
+      { action: 'Supprimer définitivement : ressources-app', detail: 'rm -rf ressources-app', title: 'Plan de lancement' },
+      { action: "Écraser l'historique sur GitHub (push forcé)", detail: 'git push --force origin main', title: 'Site vitrine' },
+      { action: "Effacer des données d'une base (DROP, TRUNCATE ou DELETE sans condition)", detail: 'psql -c "DROP TABLE clients;"', title: 'CRM coachs' }
+    ];
+    document.querySelectorAll('#preview button').forEach((b) => { b.onclick = () => show(samples[+b.dataset.i]); });
+    if (location.search.includes('auto')) setTimeout(() => show(samples[0]), 400);
+  }
+})();
+</script>
+</body>
+</html>
